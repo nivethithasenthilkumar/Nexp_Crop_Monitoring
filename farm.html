@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FarmWatch Pro - Crop Monitoring Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'farm-green': '#2d5016',
+                        'crop-yellow': '#f4d03f',
+                        'soil-brown': '#8b4513',
+                        'sky-blue': '#87ceeb',
+                        'alert-red': '#e74c3c',
+                        'healthy-green': '#27ae60'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #f8fffe 0%, #e8f5e8 50%, #f0f9ff 100%);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        .loading {
+            animation: pulse 2s infinite;
+        }
+        .map-container {
+            background: linear-gradient(45deg, #e8f5e8 25%, transparent 25%), 
+                        linear-gradient(-45deg, #e8f5e8 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, #e8f5e8 75%), 
+                        linear-gradient(-45deg, transparent 75%, #e8f5e8 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        .field-boundary {
+            border: 3px solid #27ae60;
+            border-radius: 15px;
+            background: rgba(39, 174, 96, 0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .field-boundary:hover {
+            background: rgba(39, 174, 96, 0.3);
+            border-color: #2d5016;
+        }
+        .drawing-mode {
+            cursor: crosshair;
+        }
+        .mobile-optimized {
+            font-size: 16px; /* Prevents zoom on iOS */
+        }
+        @media (max-width: 768px) {
+            .mobile-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                z-index: 50;
+            }
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen">
+    <!-- Login/Register Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full p-6">
+            <div class="text-center mb-6">
+                <div class="text-4xl mb-2">🌾</div>
+                <h2 class="text-2xl font-bold text-farm-green">FarmWatch Pro</h2>
+                <p class="text-gray-600">Smart Crop Monitoring Platform</p>
+            </div>
+            
+            <!-- Login Form -->
+            <div id="login-form">
+                <h3 class="text-xl font-semibold mb-4">Sign In</h3>
+                <form onsubmit="handleLogin(event)">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <input type="email" required class="mobile-optimized w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-farm-green focus:border-transparent" placeholder="farmer@example.com">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                            <input type="password" required class="mobile-optimized w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-farm-green focus:border-transparent">
+                        </div>
+                        <button type="submit" class="w-full bg-farm-green text-white py-2 rounded-lg hover:bg-green-800 transition-colors">
+                            Sign In
+                        </button>
+                    </div>
+                </form>
+                <p class="text-center mt-4 text-sm text-gray-600">
+                    Don't have an account? 
+                    <button onclick="showRegister()" class="text-farm-green hover:underline">Register here</button>
+                </p>
+            </div>
+            
+            <!-- Register Form -->
+            <div id="register-form" class="hidden">
+                <h3 class="text-xl font-semibold mb-4">Create Account</h3>
+                <form onsubmit="handleRegister(event)">
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                                <input type="text" required class="mobile-optimized w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-farm-green focus:border-transparent">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                                <input type="text" required class="mobile-optimized w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-farm-green focus:border-transparent">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Farm Name</label>
+                            <input type="text" required class="mobile-optimized w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-farm-green focus:border-transparent" placeholder="Green Valley Farm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <input type="email" required class="mobile-optimized w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-farm-green focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                            <input type="password" required class="mobile-optimized w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-farm-green focus:border-transparent">
+                        </div>
+                        <button type="submit" class="w-full bg-farm-green text-white py-2 rounded-lg hover:bg-green-800 transition-colors">
+                            Create Account
+                        </button>
+                    </div>
+                </form>
+                <p class="text-center mt-4 text-sm text-gray-600">
+                    Already have an account? 
+                    <button onclick="showLogin()" class="text-farm-green hover:underline">Sign in here</button>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="main-app" class="hidden">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <div class="flex items-center space-x-3">
+                        <div class="text-2xl">🌾</div>
+                        <div>
+                            <h1 class="text-xl font-bold text-farm-green">FarmWatch Pro</h1>
+                            <p class="text-xs text-gray-500" id="farm-name">Green Valley Farm</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Desktop Navigation -->
+                    <nav class="hidden md:flex space-x-6">
+                        <button onclick="showView('dashboard')" class="nav-btn text-farm-green border-b-2 border-farm-green">Dashboard</button>
+                        <button onclick="showView('fields')" class="nav-btn text-gray-600 hover:text-farm-green">Fields</button>
+                        <button onclick="showView('analytics')" class="nav-btn text-gray-600 hover:text-farm-green">Analytics</button>
+                        <button onclick="showView('alerts')" class="nav-btn text-gray-600 hover:text-farm-green">Alerts</button>
+                        <button onclick="showView('reports')" class="nav-btn text-gray-600 hover:text-farm-green">Reports</button>
+                    </nav>
+                    
+                    <!-- User Menu -->
+                    <div class="flex items-center space-x-4">
+                        <div class="hidden md:block text-right">
+                            <p class="text-sm font-medium text-gray-900" id="user-name">John Farmer</p>
+                            <p class="text-xs text-gray-500">Premium Plan</p>
+                        </div>
+                        <button onclick="handleLogout()" class="text-gray-500 hover:text-gray-700">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Mobile Navigation -->
+        <nav class="mobile-nav md:hidden bg-white border-t border-gray-200 px-4 py-2">
+            <div class="flex justify-around">
+                <button onclick="showView('dashboard')" class="mobile-nav-btn flex flex-col items-center py-2 text-farm-green">
+                    <svg class="w-5 h-5 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                    <span class="text-xs">Dashboard</span>
+                </button>
+                <button onclick="showView('fields')" class="mobile-nav-btn flex flex-col items-center py-2 text-gray-600">
+                    <svg class="w-5 h-5 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <span class="text-xs">Fields</span>
+                </button>
+                <button onclick="showView('analytics')" class="mobile-nav-btn flex flex-col items-center py-2 text-gray-600">
+                    <svg class="w-5 h-5 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+                    <span class="text-xs">Analytics</span>
+                </button>
+                <button onclick="showView('alerts')" class="mobile-nav-btn flex flex-col items-center py-2 text-gray-600">
+                    <svg class="w-5 h-5 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+                    <span class="text-xs">Alerts</span>
+                </button>
+                <button onclick="showView('reports')" class="mobile-nav-btn flex flex-col items-center py-2 text-gray-600">
+                    <svg class="w-5 h-5 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                    <span class="text-xs">Reports</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="view-content p-4 pb-20 md:pb-4">
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg p-4 shadow-sm card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Total Fields</p>
+                            <p class="text-2xl font-bold text-farm-green">12</p>
+                        </div>
+                        <div class="text-2xl">🌾</div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg p-4 shadow-sm card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Total Area</p>
+                            <p class="text-2xl font-bold text-farm-green">847</p>
+                            <p class="text-xs text-gray-500">acres</p>
+                        </div>
+                        <div class="text-2xl">📏</div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg p-4 shadow-sm card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Avg NDVI</p>
+                            <p class="text-2xl font-bold text-healthy-green">0.78</p>
+                        </div>
+                        <div class="text-2xl">📊</div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg p-4 shadow-sm card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Active Alerts</p>
+                            <p class="text-2xl font-bold text-alert-red">3</p>
+                        </div>
+                        <div class="text-2xl">⚠️</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Map -->
+            <div class="bg-white rounded-lg shadow-sm mb-6">
+                <div class="p-4 border-b border-gray-200">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-2 md:space-y-0">
+                        <h3 class="text-lg font-semibold text-farm-green">Farm Overview Map</h3>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="toggleDrawMode()" id="draw-btn" class="px-3 py-1 bg-farm-green text-white rounded text-sm hover:bg-green-800 transition-colors">
+                                ✏️ Draw Field
+                            </button>
+                            <button onclick="uploadField()" class="px-3 py-1 bg-sky-blue text-white rounded text-sm hover:bg-blue-600 transition-colors">
+                                📁 Upload GeoJSON
+                            </button>
+                            <select onchange="changeMapLayer(this.value)" class="px-3 py-1 border border-gray-300 rounded text-sm">
+                                <option value="satellite">Satellite</option>
+                                <option value="ndvi">NDVI</option>
+                                <option value="weather">Weather</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div id="farm-map" class="map-container h-64 md:h-96 relative overflow-hidden">
+                    <!-- Simulated Map with Fields -->
+                    <div class="absolute inset-0 bg-gradient-to-br from-green-100 to-green-200">
+                        <!-- Field 1 - Corn -->
+                        <div class="field-boundary absolute" style="top: 20%; left: 15%; width: 25%; height: 30%;" 
+                             onclick="selectField('field-1')" data-field="field-1">
+                            <div class="p-2 text-xs">
+                                <div class="font-semibold">North Field</div>
+                                <div class="text-gray-600">Corn • 85 acres</div>
+                                <div class="text-healthy-green">NDVI: 0.82</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Field 2 - Soybeans -->
+                        <div class="field-boundary absolute" style="top: 55%; left: 10%; width: 30%; height: 25%;" 
+                             onclick="selectField('field-2')" data-field="field-2">
+                            <div class="p-2 text-xs">
+                                <div class="font-semibold">South Field</div>
+                                <div class="text-gray-600">Soybeans • 92 acres</div>
+                                <div class="text-crop-yellow">NDVI: 0.65</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Field 3 - Wheat -->
+                        <div class="field-boundary absolute" style="top: 25%; left: 50%; width: 35%; height: 40%;" 
+                             onclick="selectField('field-3')" data-field="field-3">
+                            <div class="p-2 text-xs">
+                                <div class="font-semibold">East Field</div>
+                                <div class="text-gray-600">Wheat • 127 acres</div>
+                                <div class="text-alert-red">NDVI: 0.45</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Weather Station -->
+                        <div class="absolute top-10 right-10 bg-white rounded-full p-2 shadow-lg">
+                            <div class="text-center text-xs">
+                                <div class="text-lg">☀️</div>
+                                <div class="font-semibold">72°F</div>
+                                <div class="text-gray-600">Clear</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Map Controls -->
+                        <div class="absolute bottom-4 right-4 flex flex-col space-y-2">
+                            <button onclick="zoomIn()" class="bg-white rounded p-2 shadow-lg hover:bg-gray-50">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                            </button>
+                            <button onclick="zoomOut()" class="bg-white rounded p-2 shadow-lg hover:bg-gray-50">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Alerts -->
+            <div class="bg-white rounded-lg shadow-sm mb-6">
+                <div class="p-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-farm-green">Recent Alerts</h3>
+                </div>
+                <div class="p-4">
+                    <div class="space-y-3">
+                        <div class="flex items-start space-x-3 p-3 bg-red-50 rounded-lg">
+                            <div class="text-alert-red text-xl">⚠️</div>
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-900">Low NDVI Detected</p>
+                                <p class="text-sm text-gray-600">East Field showing stress indicators. NDVI dropped to 0.45</p>
+                                <p class="text-xs text-gray-500">2 hours ago</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start space-x-3 p-3 bg-yellow-50 rounded-lg">
+                            <div class="text-crop-yellow text-xl">🌡️</div>
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-900">Temperature Alert</p>
+                                <p class="text-sm text-gray-600">High temperatures expected (95°F+) for next 3 days</p>
+                                <p class="text-xs text-gray-500">6 hours ago</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg">
+                            <div class="text-sky-blue text-xl">💧</div>
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-900">Irrigation Reminder</p>
+                                <p class="text-sm text-gray-600">South Field irrigation scheduled for tomorrow morning</p>
+                                <p class="text-xs text-gray-500">1 day ago</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weather Forecast -->
+            <div class="bg-white rounded-lg shadow-sm">
+                <div class="p-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-farm-green">7-Day Weather Forecast</h3>
+                </div>
+                <div class="p-4">
+                    <div class="grid grid-cols-7 gap-2 text-center">
+                        <div class="p-2">
+                            <div class="text-xs text-gray-600 mb-1">Today</div>
+                            <div class="text-2xl mb-1">☀️</div>
+                            <div class="text-sm font-medium">72°</div>
+                            <div class="text-xs text-gray-600">45°</div>
+                        </div>
+                        <div class="p-2">
+                            <div class="text-xs text-gray-600 mb-1">Thu</div>
+                            <div class="text-2xl mb-1">⛅</div>
+                            <div class="text-sm font-medium">68°</div>
+                            <div class="text-xs text-gray-600">42°</div>
+                        </div>
+                        <div class="p-2">
+                            <div class="text-xs text-gray-600 mb-1">Fri</div>
+                            <div class="text-2xl mb-1">🌧️</div>
+                            <div class="text-sm font-medium">65°</div>
+                            <div class="text-xs text-gray-600">48°</div>
+                        </div>
+                        <div class="p-2">
+                            <div class="text-xs text-gray-600 mb-1">Sat</div>
+                            <div class="text-2xl mb-1">🌦️</div>
+                            <div class="text-sm font-medium">70°</div>
+                            <div class="text-xs text-gray-600">52°</div>
+                        </div>
+                        <div class="p-2">
+                            <div class="text-xs text-gray-600 mb-1">Sun</div>
+                            <div class="text-2xl mb-1">☀️</div>
+                            <div class="text-sm font-medium">75°</div>
+                            <div class="text-xs text-gray-600">55°</div>
+                        </div>
+                        <div class="p-2">
+                            <div class="text-xs text-gray-600 mb-1">Mon</div>
+                            <div class="text-2xl mb-1">☀️</div>
+                            <div class="text-sm font-medium">78°</div>
+                            <div class="text-xs text-gray-600">58°</div>
+                        </div>
+                        <div class="p-2">
+                            <div class="text-xs text-gray-600 mb-1">Tue</div>
+                            <div class="text-2xl mb-1">⛅</div>
+                            <div class="text-sm font-medium">73°</div>
+                            <div class="text-xs text-gray-600">54°</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fields View -->
+        <div id="fields-view" class="view-content hidden p-4 pb-20 md:pb-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                <h2 class="text-2xl font-bold text-farm-green mb-4 md:mb-0">Field Management</h2>
+                <button onclick="showAddFieldModal()" class="bg-farm-green text-white px-4 py-2 rounded-lg hover:bg-green-800 transition-colors">
+                    + Add New Field
+                </button>
+            </div>
+
+            <!-- Fields Grid -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Field Card 1 -->
+                <div class="bg-white rounded-lg shadow-sm card-hover">
+                    <div class="p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold">North Field</h3>
+                            <span class="px-2 py-1 bg-healthy-green text-white text-xs rounded-full">Healthy</span>
+                        </div>
+                        <div class="space-y-2 text-sm text-gray-600 mb-4">
+                            <div class="flex justify-between">
+                                <span>Crop:</span>
+                                <span class="font-medium">Corn</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Area:</span>
+                                <span class="font-medium">85 acres</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>NDVI:</span>
+                                <span class="font-medium text-healthy-green">0.82</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Growth Stage:</span>
+                                <span class="font-medium">V8 (8-leaf)</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="viewFieldDetails('field-1')" class="flex-1 bg-farm-green text-white py-2 px-3 rounded text-sm hover:bg-green-800 transition-colors">
+                                View Details
+                            </button>
+                            <button onclick="editField('field-1')" class="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Field Card 2 -->
+                <div class="bg-white rounded-lg shadow-sm card-hover">
+                    <div class="p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold">South Field</h3>
+                            <span class="px-2 py-1 bg-crop-yellow text-white text-xs rounded-full">Monitoring</span>
+                        </div>
+                        <div class="space-y-2 text-sm text-gray-600 mb-4">
+                            <div class="flex justify-between">
+                                <span>Crop:</span>
+                                <span class="font-medium">Soybeans</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Area:</span>
+                                <span class="font-medium">92 acres</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>NDVI:</span>
+                                <span class="font-medium text-crop-yellow">0.65</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Growth Stage:</span>
+                                <span class="font-medium">R2 (Full bloom)</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="viewFieldDetails('field-2')" class="flex-1 bg-farm-green text-white py-2 px-3 rounded text-sm hover:bg-green-800 transition-colors">
+                                View Details
+                            </button>
+                            <button onclick="editField('field-2')" class="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Field Card 3 -->
+                <div class="bg-white rounded-lg shadow-sm card-hover">
+                    <div class="p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold">East Field</h3>
+                            <span class="px-2 py-1 bg-alert-red text-white text-xs rounded-full">Alert</span>
+                        </div>
+                        <div class="space-y-2 text-sm text-gray-600 mb-4">
+                            <div class="flex justify-between">
+                                <span>Crop:</span>
+                                <span class="font-medium">Wheat</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Area:</span>
+                                <span class="font-medium">127 acres</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>NDVI:</span>
+                                <span class="font-medium text-alert-red">0.45</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Growth Stage:</span>
+                                <span class="font-medium">Grain filling</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="viewFieldDetails('field-3')" class="flex-1 bg-farm-green text-white py-2 px-3 rounded text-sm hover:bg-green-800 transition-colors">
+                                View Details
+                            </button>
+                            <button onclick="editField('field-3')" class="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics View -->
+        <div id="analytics-view" class="view-content hidden p-4 pb-20 md:pb-4">
+            <h2 class="text-2xl font-bold text-farm-green mb-6">Field Analytics</h2>
+            
+            <!-- Field Selector -->
+            <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+                <div class="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Field</label>
+                        <select onchange="updateAnalytics(this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-farm-green focus:border-transparent">
+                            <option value="all">All Fields</option>
+                            <option value="field-1">North Field (Corn)</option>
+                            <option value="field-2" selected>South Field (Soybeans)</option>
+                            <option value="field-3">East Field (Wheat)</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Time Period</label>
+                        <select class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-farm-green focus:border-transparent">
+                            <option value="30">Last 30 days</option>
+                            <option value="90" selected>Last 90 days</option>
+                            <option value="season">Current Season</option>
+                            <option value="year">Full Year</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NDVI Trend Chart -->
+            <div class="bg-white rounded-lg shadow-sm mb-6">
+                <div class="p-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-farm-green">NDVI Trend Analysis</h3>
+                </div>
+                <div class="p-4">
+                    <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center relative overflow-hidden">
+                        <svg class="w-full h-full" viewBox="0 0 400 200">
+                            <!-- Grid lines -->
+                            <defs>
+                                <pattern id="grid" width="40" height="20" patternUnits="userSpaceOnUse">
+                                    <path d="M 40 0 L 0 0 0 20" fill="none" stroke="#e5e7eb" stroke-width="1"/>
+                                </pattern>
+                            </defs>
+                            <rect width="100%" height="100%" fill="url(#grid)" />
+                            
+                            <!-- NDVI trend line -->
+                            <polyline points="20,160 60,140 100,120 140,100 180,90 220,95 260,110 300,105 340,100 380,95" 
+                                     fill="none" stroke="#27ae60" stroke-width="3"/>
+                            
+                            <!-- Data points -->
+                            <circle cx="20" cy="160" r="4" fill="#27ae60"/>
+                            <circle cx="100" cy="120" r="4" fill="#27ae60"/>
+                            <circle cx="180" cy="90" r="4" fill="#27ae60"/>
+                            <circle cx="260" cy="110" r="4" fill="#f4d03f"/>
+                            <circle cx="340" cy="100" r="4" fill="#27ae60"/>
+                            <circle cx="380" cy="95" r="4" fill="#27ae60"/>
+                            
+                            <!-- Labels -->
+                            <text x="200" y="190" text-anchor="middle" class="text-xs fill-gray-600">Time (Days)</text>
+                            <text x="10" y="15" class="text-xs fill-gray-600">NDVI</text>
+                            <text x="10" y="30" class="text-xs fill-gray-600">1.0</text>
+                            <text x="10" y="100" class="text-xs fill-gray-600">0.5</text>
+                            <text x="10" y="170" class="text-xs fill-gray-600">0.0</text>
+                        </svg>
+                        
+                        <!-- Legend -->
+                        <div class="absolute bottom-4 right-4 bg-white rounded p-2 shadow-sm">
+                            <div class="flex items-center space-x-2 text-xs">
+                                <div class="w-3 h-0.5 bg-healthy-green"></div>
+                                <span>NDVI Trend</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Growth Stage & Risk Assessment -->
+            <div class="grid md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white rounded-lg shadow-sm">
+                    <div class="p-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-farm-green">Growth Stage Progress</h3>
+                    </div>
+                    <div class="p-4">
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">Emergence</span>
+                                <span class="text-sm font-medium text-healthy-green">✓ Complete</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-healthy-green h-2 rounded-full" style="width: 100%"></div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">Vegetative Growth</span>
+                                <span class="text-sm font-medium text-healthy-green">✓ Complete</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-healthy-green h-2 rounded-full" style="width: 100%"></div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">Flowering</span>
+                                <span class="text-sm font-medium text-crop-yellow">🔄 In Progress</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-crop-yellow h-2 rounded-full" style="width: 75%"></div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">Pod Development</span>
+                                <span class="text-sm font-medium text-gray-500">⏳ Upcoming</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-gray-400 h-2 rounded-full" style="width: 25%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm">
+                    <div class="p-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-farm-green">Risk Assessment</h3>
+                    </div>
+                    <div class="p-4">
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                                <div class="flex items-center space-x-3">
+                                    <div class="text-healthy-green text-xl">💧</div>
+                                    <div>
+                                        <p class="font-medium">Water Stress</p>
+                                        <p class="text-sm text-gray-600">Low Risk</p>
+                                    </div>
+                                </div>
+                                <div class="text-healthy-green font-bold">15%</div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                                <div class="flex items-center space-x-3">
+                                    <div class="text-crop-yellow text-xl">🦠</div>
+                                    <div>
+                                        <p class="font-medium">Disease Risk</p>
+                                        <p class="text-sm text-gray-600">Moderate Risk</p>
+                                    </div>
+                                </div>
+                                <div class="text-crop-yellow font-bold">45%</div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                                <div class="flex items-center space-x-3">
+                                    <div class="text-alert-red text-xl">🌡️</div>
+                                    <div>
+                                        <p class="font-medium">Heat Stress</p>
+                                        <p class="text-sm text-gray-600">High Risk</p>
+                                    </div>
+                                </div>
+                                <div class="text-alert-red font-bold">75%</div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                                <div class="flex items-center space-x-3">
+                                    <div class="text-sky-blue text-xl">🐛</div>
+                                    <div>
+                                        <p class="font-medium">Pest Pressure</p>
+                                        <p class="text-sm text-gray-600">Low Risk</p>
+                                    </div>
+                                </div>
+                                <div class="text-sky-blue font-bold">20%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vegetation Indices -->
+            <div class="bg-white rounded-lg shadow-sm">
+                <div class="p-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-farm-green">Vegetation Indices Comparison</h3>
+                </div>
+                <div class="p-4">
+                    <div class="grid md:grid-cols-4 gap-4">
+                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                            <div class="text-2xl font-bold text-healthy-green mb-2">0.65</div>
+                            <div class="text-sm font-medium text-gray-700">NDVI</div>
+                            <div class="text-xs text-gray-500">Normalized Difference</div>
+                        </div>
+                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                            <div class="text-2xl font-bold text-sky-blue mb-2">0.58</div>
+                            <div class="text-sm font-medium text-gray-700">EVI</div>
+                            <div class="text-xs text-gray-500">Enhanced Vegetation</div>
+                        </div>
+                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                            <div class="text-2xl font-bold text-crop-yellow mb-2">0.72</div>
+                            <div class="text-sm font-medium text-gray-700">SAVI</div>
+                            <div class="text-xs text-gray-500">Soil Adjusted</div>
+                        </div>
+                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                            <div class="text-2xl font-bold text-farm-green mb-2">0.61</div>
+                            <div class="text-sm font-medium text-gray-700">GNDVI</div>
+                            <div class="text-xs text-gray-500">Green NDVI</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts View -->
+        <div id="alerts-view" class="view-content hidden p-4 pb-20 md:pb-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                <h2 class="text-2xl font-bold text-farm-green mb-4 md:mb-0">Alert Management</h2>
+                <button onclick="configureAlerts()" class="bg-farm-green text-white px-4 py-2 rounded-lg hover:bg-green-800 transition-colors">
+                    ⚙️ Configure Alerts
+                </button>
+            </div>
+
+            <!-- Alert Filters -->
+            <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+                <div class="grid md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Alert Type</label>
+                        <select class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="all">All Types</option>
+                            <option value="ndvi">NDVI Alerts</option>
+                            <option value="weather">Weather Alerts</option>
+                            <option value="disease">Disease Alerts</option>
+                            <option value="irrigation">Irrigation Alerts</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Severity</label>
+                        <select class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="all">All Levels</option>
+                            <option value="critical">Critical</option>
+                            <option value="warning">Warning</option>
+                            <option value="info">Information</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Field</label>
+                        <select class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="all">All Fields</option>
+                            <option value="field-1">North Field</option>
+                            <option value="field-2">South Field</option>
+                            <option value="field-3">East Field</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                        <select class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="all">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="dismissed">Dismissed</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Alerts -->
+            <div class="space-y-4">
+                <!-- Critical Alert -->
+                <div class="bg-white rounded-lg shadow-sm border-l-4 border-alert-red">
+                    <div class="p-4">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start space-x-3">
+                                <div class="text-alert-red text-2xl">🚨</div>
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <h3 class="text-lg font-semibold text-gray-900">Critical NDVI Drop</h3>
+                                        <span class="px-2 py-1 bg-alert-red text-white text-xs rounded-full">Critical</span>
+                                    </div>
+                                    <p class="text-gray-700 mb-2">East Field showing severe vegetation stress. NDVI dropped from 0.72 to 0.45 in the past week.</p>
+                                    <div class="flex flex-wrap gap-4 text-sm text-gray-600">
+                                        <span>📍 East Field (Wheat)</span>
+                                        <span>📅 2 hours ago</span>
+                                        <span>📊 NDVI: 0.45 (-37%)</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="resolveAlert('alert-1')" class="px-3 py-1 bg-healthy-green text-white rounded text-sm hover:bg-green-700 transition-colors">
+                                    Resolve
+                                </button>
+                                <button onclick="dismissAlert('alert-1')" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors">
+                                    Dismiss
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-4 p-3 bg-red-50 rounded-lg">
+                            <h4 class="font-medium text-gray-900 mb-2">Recommended Actions:</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• Investigate potential drought stress or irrigation issues</li>
+                                <li>• Check for signs of disease or pest damage</li>
+                                <li>• Consider soil moisture testing</li>
+                                <li>• Schedule field inspection within 24 hours</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Warning Alert -->
+                <div class="bg-white rounded-lg shadow-sm border-l-4 border-crop-yellow">
+                    <div class="p-4">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start space-x-3">
+                                <div class="text-crop-yellow text-2xl">⚠️</div>
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <h3 class="text-lg font-semibold text-gray-900">High Temperature Warning</h3>
+                                        <span class="px-2 py-1 bg-crop-yellow text-white text-xs rounded-full">Warning</span>
+                                    </div>
+                                    <p class="text-gray-700 mb-2">Extended high temperatures (95°F+) forecasted for next 3 days. Heat stress risk for all crops.</p>
+                                    <div class="flex flex-wrap gap-4 text-sm text-gray-600">
+                                        <span>📍 All Fields</span>
+                                        <span>📅 6 hours ago</span>
+                                        <span>🌡️ Max: 97°F</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="resolveAlert('alert-2')" class="px-3 py-1 bg-healthy-green text-white rounded text-sm hover:bg-green-700 transition-colors">
+                                    Resolve
+                                </button>
+                                <button onclick="dismissAlert('alert-2')" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors">
+                                    Dismiss
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-4 p-3 bg-yellow-50 rounded-lg">
+                            <h4 class="font-medium text-gray-900 mb-2">Recommended Actions:</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• Increase irrigation frequency if possible</li>
+                                <li>• Monitor fields for heat stress symptoms</li>
+                                <li>• Avoid field operations during peak heat hours</li>
+                                <li>• Consider foliar applications to reduce stress</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Alert -->
+                <div class="bg-white rounded-lg shadow-sm border-l-4 border-sky-blue">
+                    <div class="p-4">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start space-x-3">
+                                <div class="text-sky-blue text-2xl">💧</div>
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <h3 class="text-lg font-semibold text-gray-900">Irrigation Reminder</h3>
+                                        <span class="px-2 py-1 bg-sky-blue text-white text-xs rounded-full">Info</span>
+                                    </div>
+                                    <p class="text-gray-700 mb-2">Scheduled irrigation for South Field tomorrow at 6:00 AM. Weather conditions are optimal.</p>
+                                    <div class="flex flex-wrap gap-4 text-sm text-gray-600">
+                                        <span>📍 South Field (Soybeans)</span>
+                                        <span>📅 1 day ago</span>
+                                        <span>⏰ Tomorrow 6:00 AM</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="resolveAlert('alert-3')" class="px-3 py-1 bg-healthy-green text-white rounded text-sm hover:bg-green-700 transition-colors">
+                                    Resolve
+                                </button>
+                                <button onclick="dismissAlert('alert-3')" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors">
+                                    Dismiss
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resolved Alert -->
+                <div class="bg-white rounded-lg shadow-sm border-l-4 border-gray-300 opacity-75">
+                    <div class="p-4">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start space-x-3">
+                                <div class="text-gray-400 text-2xl">✅</div>
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <h3 class="text-lg font-semibold text-gray-600">Disease Risk Alert</h3>
+                                        <span class="px-2 py-1 bg-gray-400 text-white text-xs rounded-full">Resolved</span>
+                                    </div>
+                                    <p class="text-gray-600 mb-2">Fungal disease risk detected in North Field. Preventive treatment applied successfully.</p>
+                                    <div class="flex flex-wrap gap-4 text-sm text-gray-500">
+                                        <span>📍 North Field (Corn)</span>
+                                        <span>📅 Resolved 3 days ago</span>
+                                        <span>✅ Treatment applied</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports View -->
+        <div id="reports-view" class="view-content hidden p-4 pb-20 md:pb-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                <h2 class="text-2xl font-bold text-farm-green mb-4 md:mb-0">Season Reports</h2>
+                <button onclick="generateReport()" class="bg-farm-green text-white px-4 py-2 rounded-lg hover:bg-green-800 transition-colors">
+                    📊 Generate New Report
+                </button>
+            </div>
+
+            <!-- Report Filters -->
+            <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
+                        <select class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="season">Season Summary</option>
+                            <option value="field">Field Performance</option>
+                            <option value="crop">Crop Analysis</option>
+                            <option value="weather">Weather Impact</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Time Period</label>
+                        <select class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="current">Current Season</option>
+                            <option value="2023">2023 Season</option>
+                            <option value="2022">2022 Season</option>
+                            <option value="compare">Compare Seasons</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Fields</label>
+                        <select class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="all">All Fields</option>
+                            <option value="field-1">North Field</option>
+                            <option value="field-2">South Field</option>
+                            <option value="field-3">East Field</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Season Summary Report -->
+            <div class="bg-white rounded-lg shadow-sm mb-6">
+                <div class="p-4 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-farm-green">2024 Season Summary Report</h3>
+                        <button onclick="exportReport('season-2024')" class="px-3 py-2 bg-farm-green text-white rounded text-sm hover:bg-green-800 transition-colors">
+                            📥 Export PDF
+                        </button>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <!-- Key Metrics -->
+                    <div class="grid md:grid-cols-4 gap-6 mb-8">
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-farm-green mb-2">847</div>
+                            <div class="text-sm text-gray-600">Total Acres</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-healthy-green mb-2">0.74</div>
+                            <div class="text-sm text-gray-600">Avg NDVI</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-sky-blue mb-2">28.5"</div>
+                            <div class="text-sm text-gray-600">Total Rainfall</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-crop-yellow mb-2">156</div>
+                            <div class="text-sm text-gray-600">Growing Days</div>
+                        </div>
+                    </div>
+
+                    <!-- Field Performance -->
+                    <div class="mb-8">
+                        <h4 class="text-lg font-semibold text-gray-900 mb-4">Field Performance Summary</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left">Field Name</th>
+                                        <th class="px-4 py-2 text-left">Crop</th>
+                                        <th class="px-4 py-2 text-left">Area (acres)</th>
+                                        <th class="px-4 py-2 text-left">Avg NDVI</th>
+                                        <th class="px-4 py-2 text-left">Est. Yield</th>
+                                        <th class="px-4 py-2 text-left">Performance</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <tr>
+                                        <td class="px-4 py-2 font-medium">North Field</td>
+                                        <td class="px-4 py-2">Corn</td>
+                                        <td class="px-4 py-2">85</td>
+                                        <td class="px-4 py-2 text-healthy-green">0.82</td>
+                                        <td class="px-4 py-2">185 bu/ac</td>
+                                        <td class="px-4 py-2"><span class="px-2 py-1 bg-healthy-green text-white text-xs rounded">Excellent</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 font-medium">South Field</td>
+                                        <td class="px-4 py-2">Soybeans</td>
+                                        <td class="px-4 py-2">92</td>
+                                        <td class="px-4 py-2 text-crop-yellow">0.65</td>
+                                        <td class="px-4 py-2">52 bu/ac</td>
+                                        <td class="px-4 py-2"><span class="px-2 py-1 bg-crop-yellow text-white text-xs rounded">Good</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 font-medium">East Field</td>
+                                        <td class="px-4 py-2">Wheat</td>
+                                        <td class="px-4 py-2">127</td>
+                                        <td class="px-4 py-2 text-alert-red">0.45</td>
+                                        <td class="px-4 py-2">38 bu/ac</td>
+                                        <td class="px-4 py-2"><span class="px-2 py-1 bg-alert-red text-white text-xs rounded">Poor</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Weather Impact -->
+                    <div class="mb-8">
+                        <h4 class="text-lg font-semibold text-gray-900 mb-4">Weather Impact Analysis</h4>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="p-4 bg-blue-50 rounded-lg">
+                                <h5 class="font-medium text-gray-900 mb-2">Precipitation</h5>
+                                <p class="text-sm text-gray-700 mb-2">Total: 28.5 inches (Above average)</p>
+                                <p class="text-sm text-gray-600">Well-distributed rainfall supported good crop development in most fields. Excess moisture in late season may have contributed to disease pressure in wheat.</p>
+                            </div>
+                            <div class="p-4 bg-yellow-50 rounded-lg">
+                                <h5 class="font-medium text-gray-900 mb-2">Temperature</h5>
+                                <p class="text-sm text-gray-700 mb-2">Avg: 72°F (Normal range)</p>
+                                <p class="text-sm text-gray-600">Temperature patterns were favorable for crop growth. Heat stress events in July may have impacted wheat yield potential.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recommendations -->
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-900 mb-4">Recommendations for Next Season</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-start space-x-3 p-3 bg-green-50 rounded-lg">
+                                <div class="text-healthy-green text-xl">✅</div>
+                                <div>
+                                    <p class="font-medium text-gray-900">Continue current practices in North Field</p>
+                                    <p class="text-sm text-gray-600">Corn performance exceeded expectations. Maintain current fertilization and irrigation schedule.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-3 p-3 bg-yellow-50 rounded-lg">
+                                <div class="text-crop-yellow text-xl">⚠️</div>
+                                <div>
+                                    <p class="font-medium text-gray-900">Optimize irrigation timing in South Field</p>
+                                    <p class="text-sm text-gray-600">Soybean NDVI showed stress during flowering. Consider more frequent irrigation during critical growth stages.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-3 p-3 bg-red-50 rounded-lg">
+                                <div class="text-alert-red text-xl">🔄</div>
+                                <div>
+                                    <p class="font-medium text-gray-900">Consider crop rotation for East Field</p>
+                                    <p class="text-sm text-gray-600">Wheat underperformed significantly. Soil testing and crop rotation may improve future yields.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Available Reports -->
+            <div class="bg-white rounded-lg shadow-sm">
+                <div class="p-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-farm-green">Available Reports</h3>
+                </div>
+                <div class="p-4">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                            <div>
+                                <p class="font-medium text-gray-900">2024 Season Summary</p>
+                                <p class="text-sm text-gray-600">Complete season analysis • Generated today</p>
+                            </div>
+                            <button onclick="exportReport('season-2024')" class="px-3 py-2 bg-farm-green text-white rounded text-sm hover:bg-green-800 transition-colors">
+                                Download
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                            <div>
+                                <p class="font-medium text-gray-900">Monthly NDVI Analysis - July</p>
+                                <p class="text-sm text-gray-600">Detailed vegetation analysis • Generated 3 days ago</p>
+                            </div>
+                            <button onclick="exportReport('ndvi-july')" class="px-3 py-2 bg-farm-green text-white rounded text-sm hover:bg-green-800 transition-colors">
+                                Download
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                            <div>
+                                <p class="font-medium text-gray-900">Weather Impact Report</p>
+                                <p class="text-sm text-gray-600">Correlation analysis • Generated 1 week ago</p>
+                            </div>
+                            <button onclick="exportReport('weather-impact')" class="px-3 py-2 bg-farm-green text-white rounded text-sm hover:bg-green-800 transition-colors">
+                                Download
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Field Modal -->
+    <div id="add-field-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 class="text-xl font-semibold mb-4">Add New Field</h3>
+            <form onsubmit="addNewField(event)">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Field Name</label>
+                        <input type="text" required class="mobile-optimized w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-farm-green focus:border-transparent" placeholder="e.g., West Field">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Crop Type</label>
+                        <select required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-farm-green focus:border-transparent">
+                            <option value="">Select crop...</option>
+                            <option value="corn">Corn</option>
+                            <option value="soybeans">Soybeans</option>
+                            <option value="wheat">Wheat</option>
+                            <option value="cotton">Cotton</option>
+                            <option value="rice">Rice</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Area (acres)</label>
+                        <input type="number" required class="mobile-optimized w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-farm-green focus:border-transparent" placeholder="0">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Planting Date</label>
+                        <input type="date" required class="mobile-optimized w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-farm-green focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Field Boundary</label>
+                        <div class="space-y-2">
+                            <button type="button" onclick="drawFieldBoundary()" class="w-full px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                ✏️ Draw on Map
+                            </button>
+                            <button type="button" onclick="uploadGeoJSON()" class="w-full px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                📁 Upload GeoJSON
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex space-x-3 mt-6">
+                    <button type="submit" class="flex-1 bg-farm-green text-white py-2 rounded-lg hover:bg-green-800 transition-colors">
+                        Add Field
+                    </button>
+                    <button type="button" onclick="closeAddFieldModal()" class="flex-1 border border-gray-300 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- File Upload Input (Hidden) -->
+    <input type="file" id="geojson-upload" accept=".geojson,.json" style="display: none;" onchange="handleGeoJSONUpload(event)">
+
+    <script>
+        // Global state
+        let currentUser = null;
+        let currentView = 'dashboard';
+        let isDrawingMode = false;
+        let selectedField = null;
+
+        // Authentication functions
+        function handleLogin(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const email = formData.get('email') || event.target.querySelector('input[type="email"]').value;
+            
+            // Simulate login
+            currentUser = {
+                name: 'John Farmer',
+                email: email,
+                farmName: 'Green Valley Farm'
+            };
+            
+            document.getElementById('auth-modal').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            
+            // Update user info
+            document.getElementById('user-name').textContent = currentUser.name;
+            document.getElementById('farm-name').textContent = currentUser.farmName;
+            
+            showNotification('Welcome back, ' + currentUser.name + '!', 'success');
+        }
+
+        function handleRegister(event) {
+            event.preventDefault();
+            const form = event.target;
+            const firstName = form.querySelector('input[type="text"]').value;
+            const farmName = form.querySelectorAll('input[type="text"]')[2].value;
+            const email = form.querySelector('input[type="email"]').value;
+            
+            // Simulate registration
+            currentUser = {
+                name: firstName,
+                email: email,
+                farmName: farmName
+            };
+            
+            document.getElementById('auth-modal').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            
+            // Update user info
+            document.getElementById('user-name').textContent = currentUser.name;
+            document.getElementById('farm-name').textContent = currentUser.farmName;
+            
+            showNotification('Account created successfully! Welcome to FarmWatch Pro.', 'success');
+        }
+
+        function showLogin() {
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('register-form').classList.add('hidden');
+        }
+
+        function showRegister() {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.remove('hidden');
+        }
+
+        function handleLogout() {
+            currentUser = null;
+            document.getElementById('auth-modal').classList.remove('hidden');
+            document.getElementById('main-app').classList.add('hidden');
+            showNotification('Logged out successfully', 'info');
+        }
+
+        // Navigation functions
+        function showView(viewName) {
+            // Hide all views
+            document.querySelectorAll('.view-content').forEach(view => {
+                view.classList.add('hidden');
+            });
+            
+            // Show selected view
+            document.getElementById(viewName + '-view').classList.remove('hidden');
+            
+            // Update navigation
+            document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => {
+                btn.classList.remove('text-farm-green', 'border-b-2', 'border-farm-green');
+                btn.classList.add('text-gray-600');
+            });
+            
+            // Highlight active nav item
+            const activeButtons = document.querySelectorAll(`[onclick="showView('${viewName}')"]`);
+            activeButtons.forEach(btn => {
+                btn.classList.remove('text-gray-600');
+                btn.classList.add('text-farm-green');
+                if (btn.classList.contains('nav-btn')) {
+                    btn.classList.add('border-b-2', 'border-farm-green');
+                }
+            });
+            
+            currentView = viewName;
+        }
+
+        // Map functions
+        function toggleDrawMode() {
+            isDrawingMode = !isDrawingMode;
+            const mapElement = document.getElementById('farm-map');
+            const drawBtn = document.getElementById('draw-btn');
+            
+            if (isDrawingMode) {
+                mapElement.classList.add('drawing-mode');
+                drawBtn.textContent = '❌ Cancel Drawing';
+                drawBtn.classList.remove('bg-farm-green');
+                drawBtn.classList.add('bg-alert-red');
+                showNotification('Click and drag to draw field boundary', 'info');
+            } else {
+                mapElement.classList.remove('drawing-mode');
+                drawBtn.textContent = '✏️ Draw Field';
+                drawBtn.classList.remove('bg-alert-red');
+                drawBtn.classList.add('bg-farm-green');
+            }
+        }
+
+        function uploadField() {
+            document.getElementById('geojson-upload').click();
+        }
+
+        function handleGeoJSONUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const geoData = JSON.parse(e.target.result);
+                        showNotification('GeoJSON file uploaded successfully!', 'success');
+                        // Process the GeoJSON data here
+                    } catch (error) {
+                        showNotification('Invalid GeoJSON file format', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        function changeMapLayer(layer) {
+            const mapElement = document.getElementById('farm-map');
+            
+            // Visual feedback for layer change
+            mapElement.style.opacity = '0.7';
+            setTimeout(() => {
+                mapElement.style.opacity = '1';
+            }, 300);
+            
+            showNotification(`Switched to ${layer} layer`, 'info');
+        }
+
+        function selectField(fieldId) {
+            selectedField = fieldId;
+            
+            // Remove previous selection
+            document.querySelectorAll('.field-boundary').forEach(field => {
+                field.style.borderColor = '#27ae60';
+                field.style.borderWidth = '3px';
+            });
+            
+            // Highlight selected field
+            const selectedElement = document.querySelector(`[data-field="${fieldId}"]`);
+            if (selectedElement) {
+                selectedElement.style.borderColor = '#2d5016';
+                selectedElement.style.borderWidth = '4px';
+            }
+            
+            showNotification('Field selected. Click "View Details" for more information.', 'info');
+        }
+
+        function zoomIn() {
+            const mapElement = document.getElementById('farm-map');
+            mapElement.style.transform = 'scale(1.1)';
+            setTimeout(() => {
+                mapElement.style.transform = 'scale(1)';
+            }, 300);
+        }
+
+        function zoomOut() {
+            const mapElement = document.getElementById('farm-map');
+            mapElement.style.transform = 'scale(0.9)';
+            setTimeout(() => {
+                mapElement.style.transform = 'scale(1)';
+            }, 300);
+        }
+
+        // Field management functions
+        function showAddFieldModal() {
+            document.getElementById('add-field-modal').classList.remove('hidden');
+        }
+
+        function closeAddFieldModal() {
+            document.getElementById('add-field-modal').classList.add('hidden');
+        }
+
+        function addNewField(event) {
+            event.preventDefault();
+            const form = event.target;
+            const fieldName = form.querySelector('input[type="text"]').value;
+            
+            showNotification(`${fieldName} added successfully!`, 'success');
+            closeAddFieldModal();
+            form.reset();
+        }
+
+        function viewFieldDetails(fieldId) {
+            showNotification('Opening detailed field analysis...', 'info');
+            // Would typically open a detailed view or modal
+        }
+
+        function editField(fieldId) {
+            showNotification('Opening field editor...', 'info');
+            // Would typically open an edit modal
+        }
+
+        function drawFieldBoundary() {
+            closeAddFieldModal();
+            toggleDrawMode();
+        }
+
+        function uploadGeoJSON() {
+            document.getElementById('geojson-upload').click();
+        }
+
+        // Analytics functions
+        function updateAnalytics(fieldId) {
+            showNotification('Updating analytics for selected field...', 'info');
+            // Would update charts and data based on selected field
+        }
+
+        // Alert functions
+        function resolveAlert(alertId) {
+            showNotification('Alert marked as resolved', 'success');
+            // Would update alert status in database
+        }
+
+        function dismissAlert(alertId) {
+            showNotification('Alert dismissed', 'info');
+            // Would hide or mark alert as dismissed
+        }
+
+        function configureAlerts() {
+            showNotification('Opening alert configuration...', 'info');
+            // Would open alert settings modal
+        }
+
+        // Report functions
+        function generateReport() {
+            showNotification('Generating new report...', 'info');
+            // Would start report generation process
+        }
+
+        function exportReport(reportId) {
+            showNotification('Preparing report for download...', 'info');
+            // Would generate and download PDF report
+            setTimeout(() => {
+                showNotification('Report downloaded successfully!', 'success');
+            }, 2000);
+        }
+
+        // Utility functions
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300 transform translate-x-full`;
+            
+            const colors = {
+                success: 'bg-healthy-green text-white',
+                error: 'bg-alert-red text-white',
+                warning: 'bg-crop-yellow text-white',
+                info: 'bg-sky-blue text-white'
+            };
+            
+            notification.className += ` ${colors[type] || colors.info}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+            }, 100);
+            
+            // Auto remove
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            // Show login modal by default
+            document.getElementById('auth-modal').classList.remove('hidden');
+            
+            // Add click handlers for map drawing
+            document.getElementById('farm-map').addEventListener('click', function(e) {
+                if (isDrawingMode) {
+                    // Simulate field boundary creation
+                    showNotification('Field boundary point added', 'info');
+                }
+            });
+            
+            // Mobile menu toggle
+            window.toggleMobileMenu = function() {
+                const mobileMenu = document.getElementById('mobile-menu');
+                mobileMenu.classList.toggle('hidden');
+            };
+            
+            // Optimize for slow connections
+            if ('connection' in navigator) {
+                const connection = navigator.connection;
+                if (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g') {
+                    // Reduce image quality, disable animations, etc.
+                    document.body.classList.add('slow-connection');
+                }
+            }
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97f10dda14c1069c',t:'MTc1Nzg2NTE3NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
